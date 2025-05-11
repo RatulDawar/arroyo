@@ -870,6 +870,7 @@ pub fn construct_operator(
         OperatorName::WindowFunction => Box::new(WindowFunctionConstructor),
         OperatorName::ConnectorSource | OperatorName::ConnectorSink => {
             let op: api::ConnectorOp = prost::Message::decode(config).unwrap();
+            println!("{}", op.config);
             return connectors()
                 .get(op.connector.as_str())
                 .unwrap_or_else(|| panic!("No connector with name '{}'", op.connector))

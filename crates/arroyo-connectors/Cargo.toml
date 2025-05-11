@@ -90,5 +90,8 @@ rustls = "0.22"
 async-nats = "0.38.0"
 nkeys = "0.3.0"
 
+# Apache Iggy
+iggy = "0.4.3"
+
 [build-dependencies]
 glob = "0.3"

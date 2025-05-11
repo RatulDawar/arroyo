@@ -18,6 +18,7 @@ pub mod blackhole;
 pub mod confluent;
 pub mod filesystem;
 pub mod fluvio;
+pub mod iggy;
 pub mod impulse;
 pub mod kafka;
 pub mod kinesis;
@@ -41,6 +42,7 @@ pub fn connectors() -> HashMap<&'static str, Box<dyn ErasedConnector>> {
         Box::new(filesystem::delta::DeltaLakeConnector {}),
         Box::new(filesystem::FileSystemConnector {}),
         Box::new(fluvio::FluvioConnector {}),
+        Box::new(iggy::IggyConnector {}),
         Box::new(impulse::ImpulseConnector {}),
         Box::new(kafka::KafkaConnector {}),
         Box::new(kinesis::KinesisConnector {}),
