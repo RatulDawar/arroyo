@@ -32,7 +32,10 @@ use std::num::{NonZero, NonZeroU64};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use std::{fs, time::SystemTime};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::{
+    mpsc::{channel, Receiver, Sender},
+    oneshot,
+};
 use tonic::{
     metadata::{Ascii, MetadataValue},
     service::Interceptor,
@@ -67,9 +70,9 @@ pub mod grpc {
         tonic::include_file_descriptor_set!("api_descriptor");
 }
 
-static DB_BACKUP_NOTIFIER: OnceLock<Sender<bool>> = OnceLock::new();
+static DB_BACKUP_NOTIFIER: OnceLock<Sender<oneshot::Sender<()>>> = OnceLock::new();
 
-pub fn init_db_notifier() -> Receiver<bool> {
+pub fn init_db_notifier() -> Receiver<oneshot::Sender<()>> {
     let (tx, rx) = channel(1);
     DB_BACKUP_NOTIFIER
         .set(tx)
@@ -77,8 +80,9 @@ pub fn init_db_notifier() -> Receiver<bool> {
     rx
 }
 
-pub fn notify_db() -> Option<()> {
-    DB_BACKUP_NOTIFIER.get()?.try_send(true).ok()
+pub fn notify_db() -> Option<oneshot::Receiver<()>> {
+    let (tx, rx) = oneshot::channel();
+    DB_BACKUP_NOTIFIER.get()?.try_send(tx).ok().map(|_| rx)
 }
 
 #[derive(Debug)]
@@ -710,34 +714,46 @@ pub fn parse_expr(sql: &str) -> anyhow::Result<Expr> {
 
 #[macro_export]
 macro_rules! retry {
-    ($e:expr, $max_retries:expr, $base:expr, $max_delay:expr, |$err_var: ident| $error_handler:expr) => {{
-        use std::time::Duration;
-        use tracing::error;
-        let mut retries: u32 = 0;
+    ($e:expr, $max_retries:expr, $base:expr, $max_delay:expr, |$err_var:ident| $error_handler:expr, $retry_if:expr) => {{
         use rand::Rng;
+        use std::time::Duration;
+        let mut retries: u32 = 0;
         loop {
             match $e {
                 Ok(value) => break Ok(value),
-                Err(e) if retries < $max_retries => {
-                    retries += 1;
-                    {
-                        let $err_var = e;
-                        $error_handler;
-                    }
-                    let tmp = $max_delay.min($base * (2u32.pow(retries)));
-                    let backoff = tmp / 2
-                        + Duration::from_micros(
-                            rand::rng().random_range(0..tmp.as_micros() as u64 / 2),
-                        );
+                Err(e) => {
+                    if retries < $max_retries && $retry_if(&e) {
+                        retries += 1;
+                        {
+                            let $err_var = e;
+                            $error_handler;
+                        }
+                        let tmp = $max_delay.min($base * (2u32.pow(retries)));
+                        let backoff = tmp / 2
+                            + Duration::from_micros(
+                                rand::rng().random_range(0..tmp.as_micros() as u64 / 2),
+                            );
 
-                    tokio::time::sleep(backoff).await;
+                        tokio::time::sleep(backoff).await;
+                    } else {
+                        break Err(e);
+                    }
                 }
-                Err(e) => break Err(e),
             }
         }
     }};
-}
 
+    ($e:expr, $max_retries:expr, $base:expr, $max_delay:expr, |$err_var:ident| $error_handler:expr) => {
+        retry!(
+            $e,
+            $max_retries,
+            $base,
+            $max_delay,
+            |$err_var| $error_handler,
+            |_| true
+        )
+    };
+}
 #[cfg(test)]
 mod tests {
     use crate::parse_expr;
