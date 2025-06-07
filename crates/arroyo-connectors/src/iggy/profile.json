@@ -5,7 +5,7 @@
         "endpoint": {
             "type": "string",
             "title": "Endpoint",
-            "description": "The Apache Iggy server endpoint (e.g., 'localhost:8090')",
+            "description": "The Apache Iggy server endpoint, only HTTP is currently supported",
             "examples": [
                 "localhost:8090"
             ]
@@ -13,13 +13,11 @@
         "transport": {
             "type": "string",
             "title": "Transport Protocol",
-            "description": "The transport protocol to use for connecting to Iggy",
+            "description": "The transport protocol to use for connecting to Iggy, only HTTP is currently supported",
             "enum": [
-                "tcp",
-                "quic",
                 "http"
             ],
-            "default": "tcp"
+            "default": "http"
         },
         "authentication": {
             "type": "object",

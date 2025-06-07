@@ -144,8 +144,6 @@ impl arroyo_operator::connector::Connector for IggyConnector {
         };
 
         let transport_protocol = match transport.as_str() {
-            "tcp" => TransportProtocol::Tcp,
-            "quic" => TransportProtocol::Quic,
             "http" => TransportProtocol::Http,
             _ => bail!("Invalid transport protocol"),
         };

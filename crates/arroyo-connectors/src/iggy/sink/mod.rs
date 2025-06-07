@@ -34,17 +34,17 @@ impl IggySinkFunc {
     async fn init_client(&mut self) -> Result<()> {
         info!("Creating Iggy client for {}", self.endpoint);
 
-        // Create client with default configuration
+        
         let client = IggyClient::default();
 
-        // Set server address based on transport
-        // For now, we'll just use the endpoint as is
-        // The client will determine the appropriate protocol based on the URL format
+        
+        
+        
 
-        // Connect to the server
+        
         client.connect().await?;
 
-        // Authenticate if credentials are provided
+        
         if let (Some(username), Some(password)) = (&self.username, &self.password) {
             client.login_user(username, password).await?;
         }
@@ -62,7 +62,7 @@ impl IggySinkFunc {
             return Ok(());
         }
 
-        // Ensure client is initialized
+        
         if self.client.is_none() {
             self.init_client().await?;
         }
@@ -71,13 +71,13 @@ impl IggySinkFunc {
         let stream_id = Identifier::from_str(&self.stream)?;
         let topic_id = Identifier::from_str(&self.topic)?;
 
-        // Create partitioning strategy
+        
         let partitioning = match self.partitioning {
             PartitioningStrategy::PartitionId(id) => Partitioning::partition_id(id),
             PartitioningStrategy::Balanced => Partitioning::balanced(),
         };
 
-        // Send messages to Iggy
+        
         let mut messages_to_send = messages;
         match client.send_messages(&stream_id, &topic_id, &partitioning, &mut messages_to_send).await {
             Ok(_) => {
@@ -88,7 +88,7 @@ impl IggySinkFunc {
                 error!("Failed to send messages to Iggy: {:?}", e);
                 ctx.report_error("Could not write to Iggy", format!("{:?}", e)).await;
 
-                // Back off and retry
+                
                 sleep(Duration::from_millis(1000)).await;
                 Err(e.into())
             }
@@ -103,15 +103,15 @@ impl ArrowOperator for IggySinkFunc {
     }
 
     async fn on_start(&mut self, ctx: &mut OperatorContext) {
-        // Initialize the client
+        
         if let Err(e) = self.init_client().await {
             error!("Failed to initialize Iggy client: {:?}", e);
             ctx.report_error("Failed to initialize Iggy client", format!("{:?}", e)).await;
         }
 
-        // Set timestamp column if available
+        
         if let Some(schema) = ctx.out_schema.as_ref() {
-            // Just log that we have a schema
+            
             info!("Using schema: {:?}", schema);
         }
     }
@@ -122,17 +122,17 @@ impl ArrowOperator for IggySinkFunc {
         ctx: &mut OperatorContext,
         _: &mut dyn arroyo_operator::context::Collector,
     ) {
-        // Serialize the batch
+        
         let values = self.serializer.serialize(&batch);
 
-        // Get the timestamp column if available
+        
         let timestamps = ctx.out_schema.as_ref()
             .and_then(|schema| Some(schema.timestamp_column(&batch)));
 
-        // Create messages
+        
         let mut messages = Vec::new();
         for (i, v) in values.into_iter().enumerate() {
-            // Get timestamp if available (convert from nanos to millis)
+            
             let _timestamp = timestamps.map(|ts| {
                 if ts.is_null(i) {
                     None
@@ -141,18 +141,18 @@ impl ArrowOperator for IggySinkFunc {
                 }
             }).flatten();
 
-            // Create message
+            
             let message = Message {
-                id: 0, // Iggy will assign an ID
+                id: 0, 
                 length: v.len() as u32,
                 payload: Bytes::from(v),
-                headers: None, // No headers
+                headers: None, 
             };
 
             messages.push(message);
         }
 
-        // Send messages
+        
         if let Err(e) = self.send_messages(messages, ctx).await {
             error!("Failed to send messages to Iggy: {:?}", e);
         }
@@ -164,7 +164,7 @@ impl ArrowOperator for IggySinkFunc {
         _: &mut OperatorContext,
         _: &mut dyn arroyo_operator::context::Collector,
     ) {
-        // Close the client connection
+        
         if let Some(client) = &self.client {
             if let Err(e) = client.disconnect().await {
                 warn!("Error disconnecting from Iggy: {:?}", e);
